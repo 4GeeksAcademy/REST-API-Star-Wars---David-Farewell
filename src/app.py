@@ -25,96 +25,76 @@ db.init_app(app)
 CORS(app)
 setup_admin(app)
 
+# Error handler
 @app.errorhandler(APIException)
 def handle_invalid_usage(error):
     return jsonify(error.to_dict()), error.status_code
 
+# Sitemap
 @app.route('/')
 def sitemap():
     return generate_sitemap(app)
 
-# USERS
+# Users
 @app.route('/users', methods=['GET'])
 def get_users():
     users = User.query.all()
-    user_serialize = [user.serialize() for user in users if user.is_active]
-    return jsonify(user_serialize), 200
+    return jsonify([user.serialize() for user in users]), 200
 
 @app.route('/users/favorites', methods=['GET'])
 def get_user_favorites():
     favorites = Favorite.query.filter_by(user_id=1).all()
     return jsonify([fav.serialize() for fav in favorites]), 200
 
-# CHARACTERS
+# Characters
 @app.route('/people', methods=['GET'])
 def get_people():
     characters = Character.query.all()
     return jsonify([char.serialize() for char in characters]), 200
 
 @app.route('/people/<int:id>', methods=['GET'])
-def get_single_character(id):
+def get_person(id):
     character = Character.query.get(id)
-    if not character:
-        return jsonify({"message": "not found"}), 404
+    if character is None:
+        return jsonify({"error": "Character not found"}), 404
     return jsonify(character.serialize()), 200
 
-# PLANETS
+@app.route('/favorite/people/<int:id>', methods=['POST'])
+def add_favorite_character(id):
+    exists = Favorite.query.filter_by(user_id=1, character_id=id).first()
+    if exists:
+        return jsonify({"message": "Character already in favorites"}), 400
+
+    favorite = Favorite(user_id=1, character_id=id, planet_id=None)
+    db.session.add(favorite)
+    db.session.commit()
+    return jsonify(favorite.serialize()), 201
+
+# Planets
 @app.route('/planets', methods=['GET'])
 def get_planets():
     planets = Planet.query.all()
     return jsonify([planet.serialize() for planet in planets]), 200
 
 @app.route('/planets/<int:id>', methods=['GET'])
-def get_single_planet(id):
+def get_planet(id):
     planet = Planet.query.get(id)
-    if not planet:
-        return jsonify({"message": "not found"}), 404
+    if planet is None:
+        return jsonify({"error": "Planet not found"}), 404
     return jsonify(planet.serialize()), 200
-
-# FAVORITES POST
-@app.route('/favorite/people/<int:id>', methods=['POST'])
-def add_favorite_people(id):
-    exists = Favorite.query.filter_by(character_id=id, user_id=1).first()
-    if exists:
-        return jsonify({"message": "already exists"}), 400
-
-    favorite = Favorite(character_id=id, user_id=1, planet_id=None)
-    db.session.add(favorite)
-    db.session.commit()
-    return jsonify(favorite.serialize()), 201
 
 @app.route('/favorite/planet/<int:id>', methods=['POST'])
 def add_favorite_planet(id):
-    exists = Favorite.query.filter_by(planet_id=id, user_id=1).first()
+    exists = Favorite.query.filter_by(user_id=1, planet_id=id).first()
     if exists:
-        return jsonify({"message": "already exists"}), 400
+        return jsonify({"message": "Planet already in favorites"}), 400
 
-    favorite = Favorite(planet_id=id, user_id=1, character_id=None)
+    favorite = Favorite(user_id=1, planet_id=id, character_id=None)
     db.session.add(favorite)
     db.session.commit()
     return jsonify(favorite.serialize()), 201
 
-# FAVORITES DELETE
-@app.route('/favorite/people/<int:id>', methods=['DELETE'])
-def delete_favorite_people(id):
-    favorite = Favorite.query.filter_by(character_id=id, user_id=1).first()
-    if not favorite:
-        return jsonify({"message": "not found"}), 404
-
-    db.session.delete(favorite)
-    db.session.commit()
-    return jsonify({"message": "Favorite deleted"}), 200
-
-@app.route('/favorite/planet/<int:id>', methods=['DELETE'])
-def delete_favorite_planet(id):
-    favorite = Favorite.query.filter_by(planet_id=id, user_id=1).first()
-    if not favorite:
-        return jsonify({"message": "not found"}), 404
-
-    db.session.delete(favorite)
-    db.session.commit()
-    return jsonify({"message": "Favorite deleted"}), 200
-
+# Main
 if __name__ == '__main__':
     PORT = int(os.environ.get('PORT', 3000))
-    app.run(host='0.0.0.0', port=PORT, debug=False)
+    app.run(host='0.0.0.0', port=PORT, debug=True)
