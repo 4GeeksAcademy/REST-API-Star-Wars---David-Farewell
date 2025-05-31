@@ -15,7 +15,8 @@ class User(db.Model):
     def serialize(self):
         return {
             "id": self.id,
-            "email": self.email
+            "email": self.email,
+            # no mostramos el password
         }
 
 class Character(db.Model):
